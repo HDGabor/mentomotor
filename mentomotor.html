@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mentőmotor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; display: flex; justify-content: center; align-items: flex-start; padding: 10px; }
+    #gw { display: flex; flex-direction: column; align-items: center; background: #0d1117; padding: 14px; border-radius: 12px; font-family: sans-serif; user-select: none; }
+    #hud { display: flex; justify-content: space-between; align-items: center; width: 660px; margin-bottom: 8px; }
+    #timer { font-size: 26px; font-weight: 600; color: #f0e040; background: #111; padding: 4px 18px; border-radius: 8px; border: 2px solid #f0e040; min-width: 80px; text-align: center; }
+    #timer.urgent { color: #ff4040; border-color: #ff4040; animation: pulse 0.5s infinite alternate; }
+    @keyframes pulse { from { opacity: 1 } to { opacity: 0.5 } }
+    #pinfo { display: flex; align-items: center; gap: 8px; }
+    #plevel { background: #1e3a5f; color: #5bc0f8; padding: 3px 12px; border-radius: 6px; font-size: 13px; }
+    #pscore { color: #aaa; font-size: 13px; }
+    #sbtn { background: #1a2a1a; border: 1px solid #3a5a3a; color: #7fca7f; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    #sbtn:hover { background: #243424; }
+    canvas { display: block; border: 3px solid #e8c840; border-radius: 8px; }
+    #hint { margin-top: 7px; color: #555; font-size: 12px; }
+    #cw { position: relative; width: 660px; height: 484px; }
+    #ov { position: absolute; top: 0; left: 0; width: 660px; height: 484px; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,0.93); border-radius: 8px; color: #fff; text-align: center; display: flex; }
+    #ov h2 { font-size: 30px; font-weight: 600; }
+    #ov p { font-size: 15px; color: #bbb; line-height: 1.7; }
+    #stars { color: #f0c040; font-size: 28px; letter-spacing: 6px; min-height: 34px; }
+    #rbtn { background: #e8c840; color: #111; border: none; padding: 13px 40px; border-radius: 8px; font-size: 17px; cursor: pointer; font-weight: 700; margin-top: 4px; display: block; min-width: 220px; }
+    #rbtn:hover { background: #ffd700; }
+  </style>
+</head>
+<body>
+
+<div id="gw">
+  <div id="hud">
+    <div id="timer">--</div>
+    <div id="pinfo">
+      <span id="plevel">1. pálya</span>
+      <span id="pscore">Pontok: 0</span>
+    </div>
+    <button id="sbtn">🔊 Hang: BE</button>
+  </div>
+  <div id="cw">
+    <canvas id="c" width="660" height="484"></canvas>
+    <div id="ov">
+      <div id="stars"></div>
+      <h2 id="ov-title">Mentőmotor</h2>
+      <p id="ov-msg">Irányítsd a mentőmotort a beteghez!<br>← → ↑ ↓ vagy WASD</p>
+      <button id="rbtn">▶ START</button>
+    </div>
+  </div>
+  <div id="hint">← → ↑ ↓ vagy WASD a mozgáshoz</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<script>
+const TILE=22,COLS=30,ROWS=22,W=660,H=484;
+const TIME_LIMITS=[60,55,50,45,40,35,33,30,28,25];
+const SA_LOOP=9231;
+const SA_MEL=[[282,"G#4",78],[282,"F4",78],[282,"C5",90],[577,"G4",72],[577,"D4",78],[577,"A#4",84],[871,"C4",1340],[871,"G#4",1352],[871,"F4",1352],[2602,"F4",90],[2602,"G#4",90],[2602,"C4",96],[2891,"G4",78],[2891,"A#3",84],[2891,"D#4",90],[3179,"C4",1148],[3179,"G#3",1184],[3179,"F4",1190],[4609,"F4",1500],[4609,"G#4",1500],[4609,"D4",1500]];
+const SA_BASS=[[0,"D#3",132],[0,"D#4",150],[138,"F3",337],[150,"F4",132],[439,"G#4",138],[859,"D#4",162],[1148,"F2",325],[1436,"C4",150],[1731,"A#3",150],[1881,"C4",132],[2013,"D#4",126],[2308,"D#3",132],[2308,"A#3",150],[2446,"F3",258],[2458,"C4",138],[2722,"D#4",126],[3161,"A#3",156],[3179,"A#2",270],[3450,"C4",168],[3456,"C3",282],[3738,"D#4",168],[3744,"D#3",258],[4032,"F3",282],[4032,"F4",168],[4321,"G#3",282],[4327,"G#4",180],[4609,"A#2",282],[4898,"A#3",240],[5186,"A#3",252],[5763,"F4",78],[5907,"G#4",72],[6214,"F4",78],[6340,"F3",138],[6346,"G#4",282],[6484,"G#3",270],[6641,"F4",84],[6785,"F3",126],[6917,"A#2",276],[7200,"A#3",234],[7494,"A#3",246],[7945,"G#4",66],[8227,"G#4",54],[8359,"D#3",174],[8504,"F4",66],[8642,"G#4",258],[8648,"D#3",186],[8936,"F4",78],[8948,"D#3",150],[9225,"D#3",144],[9231,"D#4",144]];
+
+function genMaze(seed){
+  const rng=(()=>{let s=seed;return()=>{s=Math.imul(1664525,s)+1013904223|0;return(s>>>0)/4294967296;};})();
+  const grid=Array.from({length:ROWS},()=>Array(COLS).fill(1));
+  const vis=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  function carve(r,c){
+    vis[r][c]=true;grid[r][c]=0;
+    const dirs=[[0,2],[0,-2],[2,0],[-2,0]].sort(()=>rng()-0.5);
+    for(const[dr,dc]of dirs){
+      const nr=r+dr,nc=c+dc;
+      if(nr>0&&nr<ROWS-1&&nc>0&&nc<COLS-1&&!vis[nr][nc]){grid[r+dr/2][c+dc/2]=0;carve(nr,nc);}
+    }
+  }
+  carve(1,1);
+  for(let i=0;i<50;i++){
+    const r=1+Math.floor(rng()*(ROWS-2)),c=1+Math.floor(rng()*(COLS-2));
+    if(grid[r][c]===1){
+      let o=0;
+      for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&grid[nr][nc]===0)o++;}
+      if(o>=2)grid[r][c]=0;
+    }
+  }
+  return grid;
+}
+
+function farthest(maze,sr,sc){
+  const dist=Array.from({length:ROWS},()=>Array(COLS).fill(-1));
+  const q=[[sr,sc]];dist[sr][sc]=0;let best={r:sr,c:sc,d:0};
+  while(q.length){
+    const[r,c]=q.shift();
+    for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&maze[nr][nc]===0&&dist[nr][nc]===-1){
+        dist[nr][nc]=dist[r][c]+1;
+        if(dist[nr][nc]>best.d)best={r:nr,c:nc,d:dist[nr][nc]};
+        q.push([nr,nc]);
+      }
+    }
+  }
+  return best;
+}
+
+const SEEDS=[42,137,256,999,1234,5678,31415,27182,11111,22222,33333,44444,55555,66666,77777,88888,99999,12345,54321,99001];
+const ALL_MAZES=SEEDS.map(genMaze);
+function pickLevels(){const idx=[...Array(20).keys()];for(let i=19;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}return idx.slice(0,10).map(i=>ALL_MAZES[i]);}
+let SESSION_MAZES=pickLevels();
+
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const timerEl=document.getElementById('timer');
+const ovEl=document.getElementById('ov');
+const sbtn=document.getElementById('sbtn');
+const rbtn=document.getElementById('rbtn');
+
+let currentLevel=0,score=0,gameOver=true,timeLeft=60;
+let timerInt=null,animReq=null,frame=0;
+let soundOn=true,audioReady=false;
+let melSynth=null,bassSynth=null,musicTimeouts=[];
+let player={col:1,row:1},patientPos={col:28,row:20};
+let keys={},moveDelay=0,started=false;
+
+function initAudio(){
+  if(audioReady)return;audioReady=true;Tone.start();
+  melSynth=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.02,decay:0.1,sustain:0.6,release:0.3},volume:-14}).toDestination();
+  bassSynth=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'sawtooth'},envelope:{attack:0.01,decay:0.08,sustain:0.5,release:0.2},volume:-10}).toDestination();
+}
+function stopMusic(){musicTimeouts.forEach(clearTimeout);musicTimeouts=[];if(melSynth)melSynth.releaseAll();if(bassSynth)bassSynth.releaseAll();}
+function scheduleLoop(){
+  if(!audioReady||!soundOn)return;
+  function playNotes(notes,synth,offset){
+    notes.forEach(([t,note,dur])=>{
+      const tid=setTimeout(()=>{if(!soundOn||!audioReady)return;synth.triggerAttackRelease(note,Math.max(0.05,dur/1000)+'');},offset+t);
+      musicTimeouts.push(tid);
+    });
+  }
+  function loopOnce(offset){
+    if(!audioReady)return;
+    playNotes(SA_MEL,melSynth,offset);playNotes(SA_BASS,bassSynth,offset);
+    const tid=setTimeout(()=>loopOnce(0),offset+SA_LOOP);musicTimeouts.push(tid);
+  }
+  loopOnce(0);
+}
+function playWin(){if(!audioReady)return;stopMusic();const w=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'sine'},volume:-6}).toDestination();[['C5','E5','G5'],['E5','G5','C6']].forEach((c,i)=>setTimeout(()=>w.triggerAttackRelease(c,'4n'),i*400));setTimeout(()=>{if(soundOn)scheduleLoop();},1500);}
+function playFail(){if(!audioReady)return;stopMusic();const f=new Tone.Synth({oscillator:{type:'sawtooth'},volume:-10}).toDestination();['A3','G3','F3','Eb3'].forEach((n,i)=>setTimeout(()=>f.triggerAttackRelease(n,'8n'),i*180));setTimeout(()=>{if(soundOn)scheduleLoop();},1500);}
+
+sbtn.addEventListener('click',()=>{soundOn=!soundOn;sbtn.textContent=soundOn?'🔊 Hang: BE':'🔇 Hang: KI';if(!soundOn)stopMusic();else if(started){initAudio();scheduleLoop();}});
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
+document.addEventListener('keyup',e=>{keys[e.key]=false;});
+
+function isWall(c,r){if(r<0||r>=ROWS||c<0||c>=COLS)return true;return SESSION_MAZES[currentLevel][r][c]===1;}
+
+function drawWall(c,r){
+  const x=c*TILE,y=r*TILE;
+  ctx.fillStyle='#1a3060';ctx.fillRect(x,y,TILE,TILE);
+  ctx.fillStyle='#203878';ctx.fillRect(x+1,y+1,TILE-2,TILE-2);
+  ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(x+1,y+1,TILE-2,2);ctx.fillRect(x+1,y+1,2,TILE-4);
+  ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fillRect(x+TILE-2,y+1,1,TILE-2);ctx.fillRect(x+1,y+TILE-2,TILE-2,1);
+}
+function drawFloor(c,r){ctx.fillStyle=(c+r)%2===0?'#14142a':'#16163a';ctx.fillRect(c*TILE,r*TILE,TILE,TILE);}
+function drawMaze(){for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(SESSION_MAZES[currentLevel][r][c]===1)drawWall(c,r);else drawFloor(c,r);}}
+
+function heartPath(cx,cy,S){
+  ctx.beginPath();
+  ctx.moveTo(cx,cy+S*0.9);
+  ctx.bezierCurveTo(cx-S*0.1,cy+S*0.55,cx-S*1.0,cy+S*0.3,cx-S*1.0,cy-S*0.18);
+  ctx.bezierCurveTo(cx-S*1.0,cy-S*0.65,cx-S*0.5,cy-S*0.9,cx,cy-S*0.42);
+  ctx.bezierCurveTo(cx+S*0.5,cy-S*0.9,cx+S*1.0,cy-S*0.65,cx+S*1.0,cy-S*0.18);
+  ctx.bezierCurveTo(cx+S*1.0,cy+S*0.3,cx+S*0.1,cy+S*0.55,cx,cy+S*0.9);
+  ctx.closePath();
+}
+
+function drawPatient(){
+  const{col,row}=patientPos;
+  const cx=col*TILE+TILE/2,cy=row*TILE+TILE/2;
+  const t=frame*0.07;
+  const bump=Math.pow(Math.max(0,Math.sin(t)),3);
+  const S=TILE*0.44+bump*TILE*0.14;
+  const g=0.09+bump*0.2;
+  heartPath(cx,cy,S*1.9);ctx.fillStyle=`rgba(220,30,50,${g*0.4})`;ctx.fill();
+  heartPath(cx,cy,S*1.5);ctx.fillStyle=`rgba(220,30,50,${g*0.7})`;ctx.fill();
+  heartPath(cx,cy,S*1.18);ctx.fillStyle=`rgba(235,30,50,${g})`;ctx.fill();
+  heartPath(cx,cy,S);ctx.fillStyle='#e8152a';ctx.fill();
+  const ccx=cx,ccy=cy+S*0.08,cw=S*0.28,ch=S*0.7;
+  ctx.fillStyle='white';
+  ctx.beginPath();ctx.roundRect(ccx-cw/2,ccy-ch/2,cw,ch,cw*0.25);ctx.fill();
+  ctx.beginPath();ctx.roundRect(ccx-ch/2,ccy-cw/2,ch,cw,cw*0.25);ctx.fill();
+}
+
+function drawPlayer(){
+  const cx=player.col*TILE+TILE/2,cy=player.row*TILE+TILE/2;
+  const S=TILE*0.48;
+  ctx.save();ctx.translate(cx,cy);
+  ctx.fillStyle='rgba(0,0,0,0.28)';
+  ctx.beginPath();ctx.ellipse(0,S*1.0,S*1.05,S*0.18,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(-S*0.72,S*0.52,S*0.5,0,Math.PI*2);
+  ctx.fillStyle='#1a1a1a';ctx.fill();ctx.strokeStyle='#555';ctx.lineWidth=2.5;ctx.stroke();
+  ctx.strokeStyle='#3a3a3a';ctx.lineWidth=1.2;
+  for(let i=0;i<7;i++){const a=i*Math.PI*2/7+frame*0.07;ctx.beginPath();ctx.moveTo(-S*0.72,S*0.52);ctx.lineTo(-S*0.72+Math.cos(a)*S*0.42,S*0.52+Math.sin(a)*S*0.42);ctx.stroke();}
+  ctx.beginPath();ctx.arc(-S*0.72,S*0.52,S*0.12,0,Math.PI*2);ctx.fillStyle='#777';ctx.fill();
+  ctx.beginPath();ctx.arc(-S*0.72,S*0.52,S*0.5,0,Math.PI*2);ctx.strokeStyle='#333';ctx.lineWidth=4;ctx.stroke();
+  ctx.beginPath();ctx.arc(S*0.72,S*0.52,S*0.48,0,Math.PI*2);
+  ctx.fillStyle='#1a1a1a';ctx.fill();ctx.strokeStyle='#555';ctx.lineWidth=2.5;ctx.stroke();
+  ctx.strokeStyle='#3a3a3a';ctx.lineWidth=1.2;
+  for(let i=0;i<7;i++){const a=i*Math.PI*2/7+frame*0.07;ctx.beginPath();ctx.moveTo(S*0.72,S*0.52);ctx.lineTo(S*0.72+Math.cos(a)*S*0.4,S*0.52+Math.sin(a)*S*0.4);ctx.stroke();}
+  ctx.beginPath();ctx.arc(S*0.72,S*0.52,S*0.12,0,Math.PI*2);ctx.fillStyle='#777';ctx.fill();
+  ctx.beginPath();ctx.arc(S*0.72,S*0.52,S*0.48,0,Math.PI*2);ctx.strokeStyle='#333';ctx.lineWidth=4;ctx.stroke();
+  ctx.strokeStyle='#aaa';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(S*0.48,-S*0.15);ctx.lineTo(S*0.72,S*0.04);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(S*0.53,-S*0.06);ctx.lineTo(S*0.75,S*0.12);ctx.stroke();
+  ctx.strokeStyle='#999';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(-S*0.5,S*0.28);ctx.lineTo(-S*0.92,S*0.48);ctx.lineTo(-S*1.02,S*0.44);ctx.stroke();
+  if(frame%10<5){ctx.beginPath();ctx.arc(-S*1.06,S*0.42,S*0.1,0,Math.PI*2);ctx.fillStyle='rgba(200,200,200,0.25)';ctx.fill();}
+  ctx.beginPath();
+  ctx.moveTo(-S*0.88,S*0.25);ctx.lineTo(-S*0.8,-S*0.08);ctx.lineTo(-S*0.48,-S*0.58);
+  ctx.lineTo(S*0.0,-S*0.68);ctx.lineTo(S*0.5,-S*0.56);ctx.lineTo(S*0.86,-S*0.08);
+  ctx.lineTo(S*0.86,S*0.2);ctx.lineTo(S*0.48,S*0.25);ctx.closePath();
+  ctx.fillStyle='#f2f2f2';ctx.fill();ctx.strokeStyle='#ccc';ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-S*0.44,-S*0.58);ctx.lineTo(S*0.0,-S*0.68);ctx.lineTo(S*0.46,-S*0.56);
+  ctx.lineTo(S*0.28,-S*0.28);ctx.lineTo(-S*0.26,-S*0.28);ctx.closePath();
+  ctx.fillStyle='#c8e000';ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-S*0.88,S*0.02);ctx.lineTo(-S*0.48,-S*0.18);ctx.lineTo(S*0.48,-S*0.18);
+  ctx.lineTo(S*0.86,S*0.02);ctx.lineTo(S*0.86,S*0.15);ctx.lineTo(-S*0.88,S*0.15);ctx.closePath();
+  ctx.fillStyle='#d4ec00';ctx.fill();
+  ctx.fillStyle='#e83000';
+  ctx.fillRect(-S*0.84,-S*0.06,S*0.26,S*0.1);ctx.fillRect(-S*0.78,S*0.07,S*0.22,S*0.09);
+  ctx.fillRect(S*0.56,-S*0.06,S*0.26,S*0.1);ctx.fillRect(S*0.52,S*0.07,S*0.22,S*0.09);
+  const rcx=-S*0.02,rcy=-S*0.44,rcr=S*0.17;
+  ctx.fillStyle='white';
+  ctx.fillRect(rcx-rcr*0.42,rcy-rcr,rcr*0.84,rcr*2);ctx.fillRect(rcx-rcr,rcy-rcr*0.42,rcr*2,rcr*0.84);
+  ctx.fillStyle='#e81010';
+  ctx.fillRect(rcx-rcr*0.28,rcy-rcr*0.9,rcr*0.56,rcr*1.8);ctx.fillRect(rcx-rcr*0.9,rcy-rcr*0.28,rcr*1.8,rcr*0.56);
+  ctx.beginPath();
+  ctx.moveTo(S*0.46,-S*0.54);ctx.lineTo(S*0.84,-S*0.06);ctx.lineTo(S*0.76,S*0.04);ctx.lineTo(S*0.4,-S*0.46);ctx.closePath();
+  ctx.fillStyle='rgba(160,220,255,0.48)';ctx.fill();
+  ctx.beginPath();ctx.moveTo(S*0.5,-S*0.5);ctx.lineTo(S*0.68,-S*0.26);
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();ctx.ellipse(S*0.82,-S*0.04,S*0.11,S*0.08,0,0,Math.PI*2);
+  ctx.fillStyle='#fff8c0';ctx.fill();ctx.strokeStyle='#ccc';ctx.lineWidth=1;ctx.stroke();
+  ctx.strokeStyle='#555';ctx.lineWidth=3;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-S*0.1,-S*0.62);ctx.lineTo(S*0.1,-S*0.62);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-S*0.1,-S*0.62);ctx.lineTo(-S*0.22,-S*0.52);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(S*0.1,-S*0.62);ctx.lineTo(S*0.22,-S*0.52);ctx.stroke();
+  ctx.beginPath();ctx.arc(-S*0.22,-S*0.52,S*0.07,0,Math.PI*2);ctx.fillStyle='#333';ctx.fill();
+  ctx.beginPath();ctx.arc(S*0.22,-S*0.52,S*0.07,0,Math.PI*2);ctx.fillStyle='#333';ctx.fill();
+  ctx.fillStyle='#f0f0f0';ctx.beginPath();ctx.roundRect(-S*1.3,-S*0.1,S*0.44,S*0.5,3);ctx.fill();
+  ctx.strokeStyle='#bbb';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle='#c8e000';ctx.fillRect(-S*1.3,-S*0.1,S*0.44,S*0.13);
+  ctx.fillStyle='#e81010';
+  ctx.fillRect(-S*0.98,S*0.06,S*0.05,S*0.17);ctx.fillRect(-S*1.03,S*0.12,S*0.17,S*0.05);
+  const blink=Math.floor(frame/5)%2===0;
+  ctx.fillStyle='#222';ctx.fillRect(-S*0.18,-S*0.76,S*0.36,S*0.09);
+  ctx.beginPath();ctx.arc(0,-S*0.84,S*0.17,0,Math.PI*2);
+  ctx.fillStyle=blink?'#00bbff':'#001a33';ctx.fill();
+  ctx.strokeStyle=blink?'#88ddff':'#003355';ctx.lineWidth=1.5;ctx.stroke();
+  if(blink){ctx.beginPath();ctx.arc(0,-S*0.84,S*0.3,0,Math.PI*2);ctx.fillStyle='rgba(0,160,255,0.18)';ctx.fill();}
+  ctx.restore();
+}
+
+function draw(){ctx.clearRect(0,0,W,H);drawMaze();drawPatient();drawPlayer();frame++;}
+
+function handleInput(){
+  if(gameOver||!started)return;
+  if(moveDelay>0){moveDelay--;return;}
+  let dr=0,dc=0;
+  if(keys['ArrowUp']||keys['w']||keys['W'])dr=-1;
+  else if(keys['ArrowDown']||keys['s']||keys['S'])dr=1;
+  else if(keys['ArrowLeft']||keys['a']||keys['A'])dc=-1;
+  else if(keys['ArrowRight']||keys['d']||keys['D'])dc=1;
+  if(dr!==0||dc!==0){
+    const nr=player.row+dr,nc=player.col+dc;
+    if(!isWall(nc,nr)){player.row=nr;player.col=nc;moveDelay=6;if(player.col===patientPos.col&&player.row===patientPos.row)endGame(true);}
+  }
+}
+function gameLoop(){handleInput();draw();animReq=requestAnimationFrame(gameLoop);}
+
+function endGame(win){
+  gameOver=true;cancelAnimationFrame(animReq);clearInterval(timerInt);draw();
+  if(win){
+    const bonus=timeLeft*3;score+=100+bonus;
+    document.getElementById('pscore').textContent='Pontok: '+score;
+    const stars=timeLeft>Math.round(TIME_LIMITS[currentLevel]*0.65)?'★★★':timeLeft>Math.round(TIME_LIMITS[currentLevel]*0.3)?'★★☆':'★☆☆';
+    document.getElementById('stars').textContent=stars;
+    document.getElementById('ov-title').textContent='🚑 Megmentve!';
+    document.getElementById('ov-msg').innerHTML='Beteg elérve! Maradt idő: <b>'+timeLeft+' mp</b><br>Pont: <b>'+(100+bonus)+'</b> | Összesen: <b>'+score+'</b>';
+    const isLast=currentLevel>=9;
+    rbtn.textContent=isLast?'🏆 Újrakezd az elejéről':'Következő pálya ('+TIME_LIMITS[Math.min(currentLevel+1,9)]+' mp) ▶';
+    rbtn.onclick=()=>{if(isLast){currentLevel=0;score=0;SESSION_MAZES=pickLevels();}else currentLevel++;startLevel();};
+    playWin();
+  } else {
+    document.getElementById('stars').textContent='☆☆☆';
+    document.getElementById('ov-title').textContent='⏰ Lejárt az idő!';
+    document.getElementById('ov-msg').innerHTML='Nem értél oda időben.<br>Időlimit volt: <b>'+TIME_LIMITS[currentLevel]+' mp</b>';
+    rbtn.textContent='↺ Újra próbálom';rbtn.onclick=()=>startLevel();
+    playFail();
+  }
+  ovEl.style.display='flex';
+}
+
+function computePatient(){const best=farthest(SESSION_MAZES[currentLevel],1,1);patientPos={col:best.c,row:best.r};}
+
+function startLevel(){
+  gameOver=false;started=false;timeLeft=TIME_LIMITS[currentLevel];frame=0;
+  player={col:1,row:1};computePatient();
+  timerEl.textContent=timeLeft;timerEl.classList.remove('urgent');
+  document.getElementById('plevel').textContent=(currentLevel+1)+'. pálya / 10';
+  document.getElementById('pscore').textContent='Pontok: '+score;
+  cancelAnimationFrame(animReq);clearInterval(timerInt);stopMusic();
+  document.getElementById('stars').textContent='';
+  document.getElementById('ov-title').textContent=currentLevel===0?'Mentőmotor 🏍️':`${currentLevel+1}. pálya`;
+  document.getElementById('ov-msg').innerHTML=(currentLevel===0?'Irányítsd a mentőmotort a beteghez!<br>':'')+'Időlimit: <b>'+TIME_LIMITS[currentLevel]+' mp</b><br>← → ↑ ↓ vagy WASD';
+  rbtn.textContent='▶ START';rbtn.onclick=doStart;
+  ovEl.style.display='flex';draw();
+}
+
+function doStart(){
+  ovEl.style.display='none';started=true;initAudio();if(soundOn)scheduleLoop();
+  clearInterval(timerInt);
+  timerInt=setInterval(()=>{if(gameOver)return;timeLeft--;timerEl.textContent=timeLeft;if(timeLeft<=10)timerEl.classList.add('urgent');if(timeLeft<=0)endGame(false);},1000);
+  cancelAnimationFrame(animReq);gameLoop();
+}
+
+startLevel();
+</script>
+
+</body>
+</html>
