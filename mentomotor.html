@@ -2,46 +2,38 @@
 <html lang="hu">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Mentőmotor</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:#0d1117;display:flex;justify-content:center;align-items:flex-start;padding:10px;}
-    #gw{display:flex;flex-direction:column;align-items:center;background:#0d1117;padding:14px;border-radius:12px;font-family:sans-serif;user-select:none;}
-    #hud{display:flex;justify-content:space-between;align-items:center;width:660px;margin-bottom:8px;}
-    #timer{font-size:26px;font-weight:600;color:#f0e040;background:#111;padding:4px 18px;border-radius:8px;border:2px solid #f0e040;min-width:80px;text-align:center;}
+    html,body{width:100%;overflow-x:hidden;background:#0d1117;}
+    body{display:flex;justify-content:center;align-items:flex-start;padding:8px;}
+    #gw{display:flex;flex-direction:column;align-items:center;background:#0d1117;padding:10px;border-radius:12px;font-family:sans-serif;user-select:none;width:100%;max-width:680px;}
+    #hud{display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px;}
+    #timer{font-size:22px;font-weight:600;color:#f0e040;background:#111;padding:4px 14px;border-radius:8px;border:2px solid #f0e040;min-width:70px;text-align:center;}
     #timer.urgent{color:#ff4040;border-color:#ff4040;animation:pulse 0.5s infinite alternate;}
     @keyframes pulse{from{opacity:1}to{opacity:0.5}}
-    #pinfo{display:flex;align-items:center;gap:8px;}
-    #plevel{background:#1e3a5f;color:#5bc0f8;padding:3px 12px;border-radius:6px;font-size:13px;}
-    #pscore{color:#aaa;font-size:13px;}
-    #sbtn{background:#1a2a1a;border:1px solid #3a5a3a;color:#7fca7f;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;}
+    #pinfo{display:flex;align-items:center;gap:6px;flex:1;justify-content:center;}
+    #plevel{background:#1e3a5f;color:#5bc0f8;padding:3px 10px;border-radius:6px;font-size:12px;}
+    #pscore{color:#aaa;font-size:12px;}
+    #sbtn{background:#1a2a1a;border:1px solid #3a5a3a;color:#7fca7f;padding:5px 10px;border-radius:8px;cursor:pointer;font-size:12px;white-space:nowrap;}
     #sbtn:hover{background:#243424;}
-    canvas{display:block;border:3px solid #e8c840;border-radius:8px;}
+    #cw{position:relative;width:100%;}
+    canvas{display:block;width:100%;height:auto;border:3px solid #e8c840;border-radius:8px;}
     #hint{margin-top:7px;color:#555;font-size:12px;}
-    #cw{position:relative;width:660px;height:484px;}
-    #ov{position:absolute;top:0;left:0;width:660px;height:484px;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,0.93);border-radius:8px;color:#fff;text-align:center;display:flex;}
-    #ov h2{font-size:30px;font-weight:600;}
-    #ov p{font-size:15px;color:#bbb;line-height:1.7;}
-    #stars{color:#f0c040;font-size:28px;letter-spacing:6px;min-height:34px;}
-    #rbtn{background:#e8c840;color:#111;border:none;padding:13px 40px;border-radius:8px;font-size:17px;cursor:pointer;font-weight:700;margin-top:4px;display:block;min-width:220px;}
+    #ov{position:absolute;top:0;left:0;width:100%;height:100%;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,0.93);border-radius:8px;color:#fff;text-align:center;display:flex;padding:16px;}
+    #ov h2{font-size:24px;font-weight:600;}
+    #ov p{font-size:14px;color:#bbb;line-height:1.7;}
+    #stars{color:#f0c040;font-size:24px;letter-spacing:6px;min-height:30px;}
+    #rbtn{background:#e8c840;color:#111;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;font-weight:700;margin-top:4px;display:block;min-width:200px;}
     #rbtn:hover{background:#ffd700;}
-    #dpad{display:none;flex-direction:column;align-items:center;gap:4px;margin-top:12px;}
-    #dpad-mid{display:flex;gap:4px;}
-    .dkey{width:64px;height:64px;background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.25);border-radius:12px;color:white;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:none;}
-    .dkey:active,.dkey.pressed{background:rgba(255,220,0,0.35);border-color:#f0e040;}
-    @media(max-width:700px){
-      #gw{padding:6px;}
-      #hud{width:100%;}
-      #cw{width:100%;height:auto;}
-      canvas{width:100%;height:auto;}
-      #dpad{display:flex;}
-      #hint{display:none;}
-    }
+    #dpad{display:none;flex-direction:column;align-items:center;gap:6px;margin-top:10px;}
+    #dpad-mid{display:flex;gap:6px;}
+    .dkey{width:72px;height:72px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.3);border-radius:14px;color:white;font-size:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:none;transition:background 0.05s;}
+    .dkey.pressed{background:rgba(255,220,0,0.4);border-color:#f0e040;}
   </style>
 </head>
 <body>
-
 <div id="gw">
   <div id="hud">
     <div id="timer">--</div>
@@ -65,7 +57,7 @@
     <button class="dkey" id="d-up">▲</button>
     <div id="dpad-mid">
       <button class="dkey" id="d-left">◀</button>
-      <div style="width:64px;height:64px;"></div>
+      <div style="width:72px;height:72px;"></div>
       <button class="dkey" id="d-right">▶</button>
     </div>
     <button class="dkey" id="d-down">▼</button>
@@ -121,6 +113,7 @@ let melSynth=null,bassSynth=null,musicTimeouts=[];
 let player={col:1,row:1},patientPos={col:28,row:20};
 let keys={},moveDelay=0,started=false;
 const dpad={up:false,down:false,left:false,right:false};
+const isMobile='ontouchstart' in window||navigator.maxTouchPoints>0;
 
 function setupDpad(){
   const map={'d-up':()=>dpad.up=true,'d-down':()=>dpad.down=true,'d-left':()=>dpad.left=true,'d-right':()=>dpad.right=true};
@@ -133,7 +126,7 @@ function setupDpad(){
     el.addEventListener('mouseup',()=>{unmap[id]();el.classList.remove('pressed');});
     el.addEventListener('mouseleave',()=>{unmap[id]();el.classList.remove('pressed');});
   }
-  if('ontouchstart' in window||navigator.maxTouchPoints>0){
+  if(isMobile){
     document.getElementById('dpad').style.display='flex';
     document.getElementById('hint').style.display='none';
   }
@@ -164,7 +157,6 @@ function drawFloor(c,r){ctx.fillStyle=(c+r)%2===0?'#14142a':'#16163a';ctx.fillRe
 function drawMaze(){for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(SESSION_MAZES[currentLevel][r][c]===1)drawWall(c,r);else drawFloor(c,r);}}
 
 function heartPath(cx,cy,S){ctx.beginPath();ctx.moveTo(cx,cy+S*0.9);ctx.bezierCurveTo(cx-S*0.1,cy+S*0.55,cx-S*1.0,cy+S*0.3,cx-S*1.0,cy-S*0.18);ctx.bezierCurveTo(cx-S*1.0,cy-S*0.65,cx-S*0.5,cy-S*0.9,cx,cy-S*0.42);ctx.bezierCurveTo(cx+S*0.5,cy-S*0.9,cx+S*1.0,cy-S*0.65,cx+S*1.0,cy-S*0.18);ctx.bezierCurveTo(cx+S*1.0,cy+S*0.3,cx+S*0.1,cy+S*0.55,cx,cy+S*0.9);ctx.closePath();}
-
 function drawPatient(){
   const{col,row}=patientPos;const cx=col*TILE+TILE/2,cy=row*TILE+TILE/2;
   const bump=Math.pow(Math.max(0,Math.sin(frame*0.07)),3);
@@ -178,7 +170,6 @@ function drawPatient(){
   ctx.beginPath();ctx.roundRect(cx-cw/2,cy+S*0.08-ch/2,cw,ch,cw*0.25);ctx.fill();
   ctx.beginPath();ctx.roundRect(cx-ch/2,cy+S*0.08-cw/2,ch,cw,cw*0.25);ctx.fill();
 }
-
 function drawPlayer(){
   const cx=player.col*TILE+TILE/2,cy=player.row*TILE+TILE/2;const S=TILE*0.48;
   ctx.save();ctx.translate(cx,cy);
@@ -270,7 +261,7 @@ function startLevel(){
   cancelAnimationFrame(animReq);clearInterval(timerInt);stopMusic();
   document.getElementById('stars').textContent='';
   document.getElementById('ov-title').textContent=currentLevel===0?'Mentőmotor 🏍️':`${currentLevel+1}. pálya`;
-  document.getElementById('ov-msg').innerHTML=(currentLevel===0?'Irányítsd a mentőmotort a beteghez!<br>':'')+'Időlimit: <b>'+TIME_LIMITS[currentLevel]+' mp</b><br>'+(('ontouchstart' in window||navigator.maxTouchPoints>0)?'▲▼◀▶ gombok':'← → ↑ ↓ vagy WASD');
+  document.getElementById('ov-msg').innerHTML=(currentLevel===0?'Irányítsd a mentőmotort a beteghez!<br>':'')+'Időlimit: <b>'+TIME_LIMITS[currentLevel]+' mp</b><br>'+(isMobile?'▲▼◀▶ gombok':'← → ↑ ↓ vagy WASD');
   rbtn.textContent='▶ START';rbtn.onclick=doStart;
   ovEl.style.display='flex';draw();
 }
@@ -284,6 +275,5 @@ function doStart(){
 setupDpad();
 startLevel();
 </script>
-
 </body>
 </html>
